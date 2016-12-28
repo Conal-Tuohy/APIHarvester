@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- ====================================================================== 
+     APIHarvester    
+     An application for harvesting metadata records from Trove, DigitalNZ, and similar APIs, by Conal Tuohy                                                                
+     ====================================================================== -->
+<project name="APIHarvester" default="jar">
+
+	<property file="ant/build.properties"/>
+	<description>An application for harvesting metadata records from Trove, DigitalNZ, and similar APIs</description>
+
+	<path id="classpath">
+		<!--
+		<fileset dir="lib" includes="??"/>
+		-->
+	</path>
+
+	<target name="clean">
+		<echo>Cleaning the build and dist directories</echo>
+		<delete dir="build"/>
+		<delete dir="dist"/>
+	</target>
+
+	<target name="init" depends="clean">
+		<echo>Creating the required directories ...</echo>
+		<mkdir dir="dist"/>
+		<mkdir dir="build"/>		
+	</target>
+
+	<target name="compile" depends="init">
+		<echo>Compiling Java source files ...</echo>
+		<javac srcdir="src" destdir="build" includeAntRuntime="false" debug="true" debuglevel="lines,vars,source">
+			<classpath>
+<!--
+				<fileset dir="lib">
+					<include name="**/*.jar"/>
+				</fileset>
+-->				
+			</classpath>
+		</javac>
+	</target>	
+	
+	<target name="copy" depends="compile">
+		<echo>Copying auxiliary files ...</echo>
+		<!--
+		<copy todir="build">
+			<fileset dir="etc"/>			
+		</copy>		
+		-->
+	</target>		
+
+	<target name="jar" depends="copy">
+		<echo>Building the jar file ...</echo>
+		<jar destfile="dist/apiharvester.jar">
+			<manifest>
+				<attribute name="Main-Class" value="com.conaltuohy.apiharvester.APIHarvester"/>
+			</manifest>
+			<fileset dir="build"/>
+		</jar>
+	</target>
+
+</project>
