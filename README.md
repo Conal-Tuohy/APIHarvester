@@ -32,3 +32,5 @@ Example:
 java -jar apiharvester.jar retries=4 url="http://example.com/api?foo=bar" records-xpath="/response/result" id-xpath="concat('record-', @id)" resumption-xpath="concat('/api?foo=bar&page=', /response/@page-number + 1)" url-suffix="&api_key=asdkfjasd"
 
 ```
+
+See the [Wiki](https://github.com/Conal-Tuohy/APIHarvester/wiki) for real examples
