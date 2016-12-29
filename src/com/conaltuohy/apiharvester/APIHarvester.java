@@ -5,6 +5,7 @@ import java.io.OutputStream;
 import java.io.FileNotFoundException;
 import java.io.UnsupportedEncodingException;
 import java.util.HashMap;
+import java.util.Stack;
 import java.net.URL;
 import java.net.URLEncoder;
 import javax.xml.parsers.DocumentBuilderFactory;
@@ -35,6 +36,7 @@ public class APIHarvester {
 	}
 	
 	private HashMap<String, String> arguments;
+	
 	private APIHarvester(String[] args) {
 		// parse the parameters, specified as key=value pairs, into a map
 		arguments = new HashMap(args.length);
@@ -53,11 +55,17 @@ public class APIHarvester {
 			}
 			arguments.put(key, value);
 		}
-		//System.out.println(arguments);
+		System.out.println(arguments);
 		
 		// check required parameters are present
 		checkArgument("url", "The 'url' argument is required");
 		checkArgument("id-xpath", "The 'id-xpath' argument is required");
+		
+		// create output directory if needed
+		String outputDirectory = arguments.get("directory");
+		if (outputDirectory != null) {
+			new File(outputDirectory).mkdirs();
+		}
 	}
 	
 	private void checkArgument(String name, String message) {
@@ -65,19 +73,23 @@ public class APIHarvester {
 			throw new IllegalArgumentException(message);
 		}
 	}
+
+	private Stack<URL> urls = new Stack<URL>();
 	
 	private void run() throws Exception {
-		String url = arguments.get("url");
+		URL url = new URL(arguments.get("url") + getArgument("url-suffix", ""));
+		urls.push(url);
 		do {
-			url = harvest(url);
-		} while (url != null);
+			url = urls.pop();
+			harvest(url);
+		} while (! urls.isEmpty());
 	}
 	
 	private int getRetries() {
 		return Integer.valueOf(getArgument("retries", "3"));
 	}
 	
-	private String harvest(String url) throws Exception {
+	private void harvest(URL url) throws Exception {
 		// harvests from a url, returns the url to continue harvesting, or null if harvest complete
 		System.out.println("harvesting from " + url + " ...");
 		// load the XML document
@@ -89,8 +101,30 @@ public class APIHarvester {
 			Node record = records.item(i);
 			save(record);
 		}
-		// TODO handle resumption
-		return null;
+		// remember any resumption URLs
+		NodeList resumptionURLs = getResumptionURLs(doc);
+		if (resumptionURLs != null) {
+			for (int i = resumptionURLs.getLength() - 1; i >= 0; i--) {
+				String relativeResumptionURL = resumptionURLs.item(i).getNodeValue();
+				// resolve the resumption URL relative to the current URL
+				URL resumptionURL = new URL(url, relativeResumptionURL + getArgument("url-suffix", ""));
+				urls.push(resumptionURL);
+			}
+		}
+	}
+	
+	private NodeList getResumptionURLs(Document doc) throws XPathExpressionException {
+		NodeList resumptionURLs = null;
+		String resumptionXPath = arguments.get("resumption-xpath");
+		if (resumptionXPath != null) {
+			XPath xpath = XPathFactory.newInstance().newXPath();
+			resumptionURLs = (NodeList) xpath.evaluate(
+				resumptionXPath,
+				doc,
+				XPathConstants.NODESET
+			);
+		}
+		return resumptionURLs;
 	}
 	
 	private void save(Node record)
@@ -149,15 +183,15 @@ public class APIHarvester {
 		);
 	}
 	
-	private Document load(String url) throws Exception {
+	private Document load(URL url) throws Exception {
 		return load(url, getRetries());
 	}
 	
-	private Document load(String url, int retriesRemaining) throws Exception {
+	private Document load(URL url, int retriesRemaining) throws Exception {
 		DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
 		factory.setNamespaceAware(true);
 		try {
-			return factory.newDocumentBuilder().parse(new URL(url).openStream());
+			return factory.newDocumentBuilder().parse(url.openStream());
 		} catch (Exception e) {
 			System.out.println("Error reading XML. " + String.valueOf(retriesRemaining) + " retries remaining.");
 			if (retriesRemaining > 0) {
