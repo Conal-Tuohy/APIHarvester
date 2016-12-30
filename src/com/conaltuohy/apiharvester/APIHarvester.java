@@ -78,12 +78,14 @@ public class APIHarvester {
 		System.out.println("      Specifies a common suffix for URLs; useful for specifying an 'API key' for some APIs.");
 		System.out.println(" • retries");
 		System.out.println("      Specifies a number of times to retry in the event of any error; default is 3");
+		System.out.println(" • delay");
+		System.out.println("      Specifies a number of seconds to wait between requests; default is 0.");
 		System.out.println(" • indent");
 		System.out.println("      Specifies whether to indent the XML or not. Valid values are \"yes\" or \"no\". If unspecified, the value is \"no\".");
 		System.out.println();
 		System.out.println("Example:");
 		System.out.println();
-		System.out.println("java -jar apiharvester.jar retries=4 xmlns:foo=\"http://example.com/ns/foo\" url=\"http://example.com/api?foo=bar\" records-xpath=\"/foo:response/foo:result\" id-xpath=\"concat('record-', @id)\" resumption-xpath=\"concat('/api?foo=bar&page=', /foo:response/@page-number + 1)\" url-suffix=\"&api_key=asdkfjasd\" indent=yes");
+		System.out.println("java -jar apiharvester.jar retries=4 xmlns:foo=\"http://example.com/ns/foo\" url=\"http://example.com/api?foo=bar\" records-xpath=\"/foo:response/foo:result\" id-xpath=\"concat('record-', @id)\" resumption-xpath=\"concat('/api?foo=bar&page=', /foo:response/@page-number + 1)\" url-suffix=\"&api_key=asdkfjasd\" indent=yes delay=10");
 	}
 
 	private HashMap<String, String> arguments;
@@ -161,11 +163,13 @@ public class APIHarvester {
 			}
 			
 			URL url = new URL(arguments.get("url") + getArgument("url-suffix", ""));
-			urls.push(url);
-			do {
+			harvest(url);
+			while (! urls.isEmpty()) {
+				// one or more "resumption" URLs remain to be harvested
+				Thread.sleep(getDelay());
 				url = urls.pop();
 				harvest(url);
-			} while (! urls.isEmpty());
+			};
 			
 			System.out.println();
 			System.out.println(
@@ -177,6 +181,10 @@ public class APIHarvester {
 	
 	private int getRetries() {
 		return Integer.valueOf(getArgument("retries", "3"));
+	}
+	
+	private long getDelay() {
+		return Long.valueOf(getArgument("delay", "0")) * 1000;
 	}
 	
 	private void harvest(URL url) throws Exception {

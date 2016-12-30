@@ -40,13 +40,14 @@ Parameters:
       Specifies a common suffix for URLs; useful for specifying an 'API key' for some APIs.
  • retries
       Specifies a number of times to retry in the event of any error; default is 3
+ • delay
+      Specifies a number of seconds to wait between requests; default is 0.
  • indent
       Specifies whether to indent the XML or not. Valid values are "yes" or "no". If unspecified, the value is "no".
 
 Example:
 
-java -jar apiharvester.jar retries=4 xmlns:foo="http://example.com/ns/foo" url="http://example.com/api?foo=bar" records-xpath="/foo:response/foo:result" id-xpath="concat('record-', @id)" resumption-xpath="concat('/api?foo=bar&page=', /foo:response/@page-number + 1)" url-suffix="&api_key=asdkfjasd"
-
+java -jar apiharvester.jar retries=4 xmlns:foo="http://example.com/ns/foo" url="http://example.com/api?foo=bar" records-xpath="/foo:response/foo:result" id-xpath="concat('record-', @id)" resumption-xpath="concat('/api?foo=bar&page=', /foo:response/@page-number + 1)" url-suffix="&api_key=asdkfjasd" indent=yes delay=10
 ```
 
 See the [Wiki](https://github.com/Conal-Tuohy/APIHarvester/wiki) for real examples
