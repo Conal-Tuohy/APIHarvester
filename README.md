@@ -40,6 +40,8 @@ Parameters:
       Specifies a common suffix for URLs; useful for specifying an 'API key' for some APIs.
  • retries
       Specifies a number of times to retry in the event of any error; default is 3
+ • indent
+      Specifies whether to indent the XML or not. Valid values are "yes" or "no". If unspecified, the value is "no".
 
 Example:
 

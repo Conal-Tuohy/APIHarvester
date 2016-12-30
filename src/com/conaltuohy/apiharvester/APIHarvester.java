@@ -18,6 +18,7 @@ import javax.xml.xpath.XPathFactory;
 import javax.xml.xpath.XPathExpression;
 import javax.xml.xpath.XPathExpressionException;
 import javax.xml.namespace.NamespaceContext;
+import javax.xml.transform.OutputKeys;
 import javax.xml.transform.Transformer;
 import javax.xml.transform.TransformerFactory;
 import javax.xml.transform.TransformerException;
@@ -77,10 +78,12 @@ public class APIHarvester {
 		System.out.println("      Specifies a common suffix for URLs; useful for specifying an 'API key' for some APIs.");
 		System.out.println(" • retries");
 		System.out.println("      Specifies a number of times to retry in the event of any error; default is 3");
+		System.out.println(" • indent");
+		System.out.println("      Specifies whether to indent the XML or not. Valid values are \"yes\" or \"no\". If unspecified, the value is \"no\".");
 		System.out.println();
 		System.out.println("Example:");
 		System.out.println();
-		System.out.println("java -jar apiharvester.jar retries=4 xmlns:foo=\"http://example.com/ns/foo\" url=\"http://example.com/api?foo=bar\" records-xpath=\"/foo:response/foo:result\" id-xpath=\"concat('record-', @id)\" resumption-xpath=\"concat('/api?foo=bar&page=', /foo:response/@page-number + 1)\" url-suffix=\"&api_key=asdkfjasd\"");
+		System.out.println("java -jar apiharvester.jar retries=4 xmlns:foo=\"http://example.com/ns/foo\" url=\"http://example.com/api?foo=bar\" records-xpath=\"/foo:response/foo:result\" id-xpath=\"concat('record-', @id)\" resumption-xpath=\"concat('/api?foo=bar&page=', /foo:response/@page-number + 1)\" url-suffix=\"&api_key=asdkfjasd\" indent=yes");
 	}
 
 	private HashMap<String, String> arguments;
@@ -211,6 +214,10 @@ public class APIHarvester {
 		return resumptionURLs;
 	}
 	
+	private String getIndent() {
+			return getArgument("indent", "no");
+	}
+	
 	private void save(Node record)
 		throws 
 			FileNotFoundException, 
@@ -227,6 +234,7 @@ public class APIHarvester {
 		OutputStream out = new FileOutputStream(file);
 		TransformerFactory tf = TransformerFactory.newInstance();
 		Transformer t = tf.newTransformer();
+		t.setOutputProperty(OutputKeys.INDENT, getIndent());
 		DOMSource source = new DOMSource(record);
 		StreamResult result = new StreamResult(out);
 		t.transform(source, result);
