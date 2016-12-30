@@ -1,7 +1,7 @@
 # APIHarvester
 An application for harvesting metadata records from Trove, DigitalNZ, and similar APIs
 
-APIHarvester is [available as an executable Java archive (jar) file](https://github.com/Conal-Tuohy/APIHarvester/releases/tag/1.0). 
+APIHarvester is [available as an executable Java archive (jar) file](https://github.com/Conal-Tuohy/APIHarvester/releases/latest). 
 
 Running it without any parameters produces the following explanatory output:
 
