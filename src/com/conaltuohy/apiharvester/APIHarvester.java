@@ -220,7 +220,7 @@ public class APIHarvester {
 					XPathConstants.NODESET
 				);
 				for (int i = resumptionURLNodes.getLength() - 1; i >= 0; i--) {
-					String relativeResumptionURL = resumptionURLNodes.item(i).getNodeValue();
+					String relativeResumptionURL = resumptionURLNodes.item(i).getTextContent();
 					resumptionURLs.push(relativeResumptionURL);
 				}
 			} catch (Exception e) {
