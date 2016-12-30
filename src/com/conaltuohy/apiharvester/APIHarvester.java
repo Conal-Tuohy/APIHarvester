@@ -192,24 +192,39 @@ public class APIHarvester {
 			save(record);
 		}
 		// remember any resumption URLs
-		NodeList resumptionURLs = getResumptionURLs(doc);
-		if (resumptionURLs != null) {
-			for (int i = resumptionURLs.getLength() - 1; i >= 0; i--) {
-				String relativeResumptionURL = resumptionURLs.item(i).getNodeValue();
-				// resolve the resumption URL relative to the current URL
-				URL resumptionURL = new URL(url, relativeResumptionURL + getArgument("url-suffix", ""));
-				urls.push(resumptionURL);
-			}
+		Stack<String> resumptionURLs = getResumptionURLs(doc);
+		//NodeList resumptionURLs = getResumptionURLs(doc);
+		for (String relativeResumptionURL : resumptionURLs) {
+			// resolve the resumption URL relative to the current URL
+			URL resumptionURL = new URL(url, relativeResumptionURL + getArgument("url-suffix", ""));
+			urls.push(resumptionURL);
 		}
 	}
 	
-	private NodeList getResumptionURLs(Document doc) throws XPathExpressionException {
-		NodeList resumptionURLs = null;
+	private Stack<String> getResumptionURLs(Document doc) throws XPathExpressionException {
+		Stack<String> resumptionURLs = new Stack<String>();
 		if (resumptionXPath != null) {
-			resumptionURLs = (NodeList) resumptionXPath.evaluate(
-				doc,
-				XPathConstants.NODESET
-			);
+			try {
+				// accept a list of resumption URLs
+				NodeList resumptionURLNodes = null;
+				resumptionURLNodes = (NodeList) resumptionXPath.evaluate(
+					doc,
+					XPathConstants.NODESET
+				);
+				for (int i = resumptionURLNodes.getLength() - 1; i >= 0; i--) {
+					String relativeResumptionURL = resumptionURLNodes.item(i).getNodeValue();
+					resumptionURLs.push(relativeResumptionURL);
+				}
+			} catch (Exception e) {
+				// accept a single resumption URL as a String
+				String relativeResumptionURL = (String) resumptionXPath.evaluate(
+					doc,
+					XPathConstants.STRING
+				);
+				if (!"".equals(relativeResumptionURL)) {
+					resumptionURLs.push(relativeResumptionURL);
+				}
+			}
 		}
 		return resumptionURLs;
 	}
