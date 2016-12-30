@@ -19,19 +19,31 @@ Usage:
 
 java -jar apiharvester.jar [parameter list]
 
-Parameters are specified as [key=value]. Values containing spaces should be enclosed in quotes.
+Parameters are specified as [key=value]. Values containing spaces, ampersands, etc should be enclosed in quotes.
+XML namespace prefixes can be bound to namespace URIs using 'xmlns:' parameters.
 
-directory (location of output files - default is current directory)
-url (initial URL to harvest from - required)
-records-xpath (xpath identifying the individual records within a response - default is to save entire response as a single record)
-id-xpath (xpath of unique id for each record, evaluated within the context of each record - required)
-resumption-xpath (xpath of URL or URLs for subsequent pages of data - default is to harvest only from the initial URL)
-url-suffix (specifies a common suffix for URLs; useful for specifying an 'API key')
-retries (specifies a number of times to retry, in the event of any error; default is 3)
+Parameters:
+
+ • xmlns:foo
+      Binds the 'foo' namespace prefix to a namespace URI, for use in the XPath expressions.
+ • directory
+      Location of output files. If not specified, the current directory is used.
+ • url
+      Initial URL to harvest from - required.
+ • records-xpath
+      XPath identifying the individual records within a response. If not specified, the entire response is saved as a single record.
+ • id-xpath
+      XPath of unique id for each record, evaluated within the context of each record - required.
+ • resumption-xpath
+      XPath of URL or URLs for subsequent pages of data - if not specified only the initial URL will be harvested)
+ • url-suffix
+      Specifies a common suffix for URLs; useful for specifying an 'API key' for some APIs.
+ • retries
+      Specifies a number of times to retry in the event of any error; default is 3
 
 Example:
 
-java -jar apiharvester.jar retries=4 url="http://example.com/api?foo=bar" records-xpath="/response/result" id-xpath="concat('record-', @id)" resumption-xpath="concat('/api?foo=bar&page=', /response/@page-number + 1)" url-suffix="&api_key=asdkfjasd"
+java -jar apiharvester.jar retries=4 xmlns:foo="http://example.com/ns/foo" url="http://example.com/api?foo=bar" records-xpath="/foo:response/foo:result" id-xpath="concat('record-', @id)" resumption-xpath="concat('/api?foo=bar&page=', /foo:response/@page-number + 1)" url-suffix="&api_key=asdkfjasd"
 
 ```
 
