@@ -5,14 +5,19 @@ import java.io.OutputStream;
 import java.io.FileNotFoundException;
 import java.io.UnsupportedEncodingException;
 import java.util.HashMap;
+import java.util.Map;
+import java.util.Iterator;
 import java.util.Stack;
+import java.util.Vector;
 import java.net.URL;
 import java.net.URLEncoder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.xpath.XPath;
 import javax.xml.xpath.XPathConstants;
 import javax.xml.xpath.XPathFactory;
+import javax.xml.xpath.XPathExpression;
 import javax.xml.xpath.XPathExpressionException;
+import javax.xml.namespace.NamespaceContext;
 import javax.xml.transform.Transformer;
 import javax.xml.transform.TransformerFactory;
 import javax.xml.transform.TransformerException;
@@ -51,19 +56,31 @@ public class APIHarvester {
 		System.out.println();
 		System.out.println("java -jar apiharvester.jar [parameter list]");
 		System.out.println();
-		System.out.println("Parameters are specified as [key=value]. Values containing spaces should be enclosed in quotes.");
+		System.out.println("Parameters are specified as [key=value]. Values containing spaces, ampersands, etc should be enclosed in quotes.");
+		System.out.println("XML namespace prefixes can be bound to namespace URIs using 'xmlns:' parameters.");
 		System.out.println();
-		System.out.println("directory (location of output files - default is current directory)");
-		System.out.println("url (initial URL to harvest from - required)");
-		System.out.println("records-xpath (xpath identifying the individual records within a response - default is to save entire response as a single record)");
-		System.out.println("id-xpath (xpath of unique id for each record, evaluated within the context of each record - required)");
-		System.out.println("resumption-xpath (xpath of URL or URLs for subsequent pages of data - default is to harvest only from the initial URL)");
-		System.out.println("url-suffix (specifies a common suffix for URLs; useful for specifying an 'API key')");
-		System.out.println("retries (specifies a number of times to retry, in the event of any error; default is 3)");
+		System.out.println("Parameters:");
+		System.out.println();
+		System.out.println(" • xmlns:foo");
+		System.out.println("      Binds the 'foo' namespace prefix to a namespace URI, for use in the XPath expressions.");
+		System.out.println(" • directory");
+		System.out.println("      Location of output files. If not specified, the current directory is used.");
+		System.out.println(" • url");
+		System.out.println("      Initial URL to harvest from - required.");
+		System.out.println(" • records-xpath");
+		System.out.println("      XPath identifying the individual records within a response. If not specified, the entire response is saved as a single record.");
+		System.out.println(" • id-xpath");
+		System.out.println("      XPath of unique id for each record, evaluated within the context of each record - required.");
+		System.out.println(" • resumption-xpath");
+		System.out.println("      XPath of URL or URLs for subsequent pages of data - if not specified only the initial URL will be harvested)");
+		System.out.println(" • url-suffix");
+		System.out.println("      Specifies a common suffix for URLs; useful for specifying an 'API key' for some APIs.");
+		System.out.println(" • retries");
+		System.out.println("      Specifies a number of times to retry in the event of any error; default is 3");
 		System.out.println();
 		System.out.println("Example:");
 		System.out.println();
-		System.out.println("java -jar apiharvester.jar retries=4 url=\"http://example.com/api?foo=bar\" records-xpath=\"/response/result\" id-xpath=\"concat('record-', @id)\" resumption-xpath=\"concat('/api?foo=bar&page=', /response/@page-number + 1)\" url-suffix=\"&api_key=asdkfjasd\"");
+		System.out.println("java -jar apiharvester.jar retries=4 xmlns:foo=\"http://example.com/ns/foo\" url=\"http://example.com/api?foo=bar\" records-xpath=\"/foo:response/foo:result\" id-xpath=\"concat('record-', @id)\" resumption-xpath=\"concat('/api?foo=bar&page=', /foo:response/@page-number + 1)\" url-suffix=\"&api_key=asdkfjasd\"");
 	}
 
 	private HashMap<String, String> arguments;
@@ -78,13 +95,21 @@ public class APIHarvester {
 			}
 			String key = argument.substring(0, delimiterPosition);
 			if (key.length() == 0) {
-				throw new IllegalArgumentException("The argument name is missing: " + argument);
+				throw new IllegalArgumentException("The parameter name is missing: " + argument);
 			}
 			String value = argument.substring(delimiterPosition + 1);
 			if (value.length() == 0) {
-				throw new IllegalArgumentException("The argument value is missing: " + argument);
+				throw new IllegalArgumentException("The parameter value is missing: " + argument);
 			}
 			arguments.put(key, value);
+		}
+		if (!arguments.isEmpty()) {
+			System.out.println("Harvest will run with the following parameters:");
+			System.out.println();
+			for (Map.Entry<String, String> argument : arguments.entrySet()) {
+				System.out.println(argument.getKey() + "=" + argument.getValue());
+			}
+			System.out.println();
 		}
 	}
 	
@@ -95,6 +120,10 @@ public class APIHarvester {
 	}
 
 	private Stack<URL> urls = new Stack<URL>();
+	private int harvested = 0;
+	XPathExpression recordsXPath = null;
+	XPathExpression idXPath = null;
+	XPathExpression resumptionXPath = null;
 	
 	private void run() throws Exception {
 		if (arguments.isEmpty()) {
@@ -103,6 +132,24 @@ public class APIHarvester {
 			// check required parameters are present
 			checkArgument("url", "The 'url' argument is required");
 			checkArgument("id-xpath", "The 'id-xpath' argument is required");
+			
+			// compile XPath expressions
+			XMLNamespaceContext namespaces = new XMLNamespaceContext();
+			for (String key : arguments.keySet()) {
+				if (key.startsWith("xmlns:")) {
+					// argument specifies an XML namespace binding
+					String prefix = key.substring(6); // after "xmlns:"
+					String namespaceURI = arguments.get(key);
+					namespaces.bind(prefix, namespaceURI);
+				}
+			}
+			XPath xpath = XPathFactory.newInstance().newXPath();
+			xpath.setNamespaceContext(namespaces);
+			recordsXPath = xpath.compile(getRecordsXPath());
+			idXPath = xpath.compile(arguments.get("id-xpath"));
+			if (arguments.containsKey("resumption-xpath")) {
+				resumptionXPath = xpath.compile(arguments.get("resumption-xpath"));
+			}
 			
 			// create output directory if needed
 			String outputDirectory = arguments.get("directory");
@@ -116,6 +163,12 @@ public class APIHarvester {
 				url = urls.pop();
 				harvest(url);
 			} while (! urls.isEmpty());
+			
+			System.out.println();
+			System.out.println(
+				String.valueOf(harvested) +
+				((harvested == 1) ? " record was harvested." : " records were harvested.")
+			);
 		}
 	}
 	
@@ -149,11 +202,8 @@ public class APIHarvester {
 	
 	private NodeList getResumptionURLs(Document doc) throws XPathExpressionException {
 		NodeList resumptionURLs = null;
-		String resumptionXPath = arguments.get("resumption-xpath");
 		if (resumptionXPath != null) {
-			XPath xpath = XPathFactory.newInstance().newXPath();
-			resumptionURLs = (NodeList) xpath.evaluate(
-				resumptionXPath,
+			resumptionURLs = (NodeList) resumptionXPath.evaluate(
 				doc,
 				XPathConstants.NODESET
 			);
@@ -180,6 +230,7 @@ public class APIHarvester {
 		DOMSource source = new DOMSource(record);
 		StreamResult result = new StreamResult(out);
 		t.transform(source, result);
+		harvested++;
 	}
 	
 	private String getFilename(Node record) 
@@ -188,8 +239,7 @@ public class APIHarvester {
 			UnsupportedEncodingException
 	{
 		XPath xpath = XPathFactory.newInstance().newXPath();
-		String id = (String) xpath.evaluate(
-			arguments.get("id-xpath"),
+		String id = (String) idXPath.evaluate(
 			record,
 			XPathConstants.STRING
 		);
@@ -209,9 +259,7 @@ public class APIHarvester {
 	}
 	
 	private NodeList getRecords(Document doc) throws XPathExpressionException {
-		XPath xpath = XPathFactory.newInstance().newXPath();
-		return (NodeList) xpath.evaluate(
-			getRecordsXPath(),
+		return (NodeList) recordsXPath.evaluate(
 			doc,
 			XPathConstants.NODESET
 		);
@@ -235,5 +283,43 @@ public class APIHarvester {
 				throw e;
 			}
 		}
-	}		
+	}
+	
+	private class XMLNamespaceContext implements NamespaceContext {
+		private HashMap<String, String> bindings = new HashMap<String, String>();
+		
+		private void bind(String prefix, String namespaceURI) {
+			bindings.put(prefix, namespaceURI);
+		}
+		
+		// NamespaceContext implementation
+		public String getNamespaceURI(String prefix) {
+			return bindings.get(prefix);
+		}
+		
+		public String getPrefix(String namespaceURI) throws IllegalArgumentException {
+			if (namespaceURI == null) {
+				throw new IllegalArgumentException();
+			};
+			for (Map.Entry<String, String> binding : bindings.entrySet()) {
+				if (namespaceURI.equals(binding.getValue())) {
+					return binding.getKey();
+				}
+			}
+			return null;
+		}
+
+		public Iterator<String> getPrefixes(String namespaceURI) throws IllegalArgumentException {
+			if (namespaceURI == null) {
+				throw new IllegalArgumentException();
+			};
+			Vector<String> prefixes = new Vector<String>();
+			for (Map.Entry<String, String> binding : bindings.entrySet()) {
+				if (namespaceURI.equals(binding.getValue())) {
+					prefixes.add(binding.getKey());
+				}
+			}
+			return prefixes.iterator();
+		}
+	}
 }
