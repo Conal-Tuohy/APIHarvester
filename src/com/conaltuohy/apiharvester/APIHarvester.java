@@ -129,6 +129,7 @@ public class APIHarvester {
 	XPathExpression recordsXPath = null;
 	XPathExpression idXPath = null;
 	XPathExpression resumptionXPath = null;
+	private Transformer transformer = null;
 	
 	private void run() throws Exception {
 		if (arguments.isEmpty()) {
@@ -155,6 +156,11 @@ public class APIHarvester {
 			if (arguments.containsKey("resumption-xpath")) {
 				resumptionXPath = xpath.compile(arguments.get("resumption-xpath"));
 			}
+			
+			// prepare transformer for serializing records
+			TransformerFactory tf = TransformerFactory.newInstance();
+			transformer = tf.newTransformer();
+			transformer.setOutputProperty(OutputKeys.INDENT, getIndent());			
 			
 			// create output directory if needed
 			String outputDirectory = arguments.get("directory");
@@ -254,13 +260,10 @@ public class APIHarvester {
 			arguments.get("directory"),
 			getFilename(record)
 		);
-		OutputStream out = new FileOutputStream(file);
-		TransformerFactory tf = TransformerFactory.newInstance();
-		Transformer t = tf.newTransformer();
-		t.setOutputProperty(OutputKeys.INDENT, getIndent());
 		DOMSource source = new DOMSource(record);
+		OutputStream out = new FileOutputStream(file);
 		StreamResult result = new StreamResult(out);
-		t.transform(source, result);
+		transformer.transform(source, result);
 		harvested++;
 	}
 	
@@ -303,6 +306,7 @@ public class APIHarvester {
 	private Document load(URL url, int retriesRemaining) throws Exception {
 		DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
 		factory.setNamespaceAware(true);
+		factory.setFeature("http://apache.org/xml/features/nonvalidating/load-external-dtd", false);
 		try {
 			return factory.newDocumentBuilder().parse(url.openStream());
 		} catch (Exception e) {
