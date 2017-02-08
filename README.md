@@ -34,6 +34,10 @@ Parameters:
       XPath identifying the individual records within a response. If not specified, the entire response is saved as a single record.
  • id-xpath
       XPath of unique id for each record, evaluated within the context of each record - required.
+ • discard-xpath
+      XPath of elements or text which should be discarded, evaluated within the context of each record.
+ • resume-when-xpath
+      XPath determining whether to resume from a harvest page or not - default = "true()"
  • resumption-xpath
       XPath of URL or URLs for subsequent pages of data - if not specified only the initial URL will be harvested)
  • url-suffix
@@ -47,7 +51,7 @@ Parameters:
 
 Example:
 
-java -jar apiharvester.jar retries=4 xmlns:foo="http://example.com/ns/foo" url="http://example.com/api?foo=bar" records-xpath="/foo:response/foo:result" id-xpath="concat('record-', @id)" resumption-xpath="concat('/api?foo=bar&page=', /foo:response/@page-number + 1)" url-suffix="&api_key=asdkfjasd" indent=yes delay=10
+java -jar apiharvester.jar retries=4 xmlns:foo="http://example.com/ns/foo" url="http://example.com/api?foo=bar" records-xpath="/foo:response/foo:result" id-xpath="concat('record-', @id)" discard-xpath="*[not(normalize-space())]" resumption-xpath="concat('/api?foo=bar&page=', /foo:response/@page-number + 1)" url-suffix="&api_key=asdkfjasd" indent=yes delay=10
 ```
 
 See the [Wiki](https://github.com/Conal-Tuohy/APIHarvester/wiki) for real examples

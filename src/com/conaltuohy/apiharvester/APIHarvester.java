@@ -72,6 +72,10 @@ public class APIHarvester {
 		System.out.println("      XPath identifying the individual records within a response. If not specified, the entire response is saved as a single record.");
 		System.out.println(" • id-xpath");
 		System.out.println("      XPath of unique id for each record, evaluated within the context of each record - required.");
+		System.out.println(" • discard-xpath");
+		System.out.println("      XPath of elements or text which should be discarded, evaluated within the context of each record.");
+		System.out.println(" • resume-when-xpath");
+		System.out.println("      XPath determining whether to resume from a harvest page or not - default = \"true()\"");
 		System.out.println(" • resumption-xpath");
 		System.out.println("      XPath of URL or URLs for subsequent pages of data - if not specified only the initial URL will be harvested)");
 		System.out.println(" • url-suffix");
@@ -85,7 +89,7 @@ public class APIHarvester {
 		System.out.println();
 		System.out.println("Example:");
 		System.out.println();
-		System.out.println("java -jar apiharvester.jar retries=4 xmlns:foo=\"http://example.com/ns/foo\" url=\"http://example.com/api?foo=bar\" records-xpath=\"/foo:response/foo:result\" id-xpath=\"concat('record-', @id)\" resumption-xpath=\"concat('/api?foo=bar&page=', /foo:response/@page-number + 1)\" url-suffix=\"&api_key=asdkfjasd\" indent=yes delay=10");
+		System.out.println("java -jar apiharvester.jar retries=4 xmlns:foo=\"http://example.com/ns/foo\" url=\"http://example.com/api?foo=bar\" records-xpath=\"/foo:response/foo:result\" id-xpath=\"concat('record-', @id)\" discard-xpath=\"*[not(normalize-space())]\" resumption-xpath=\"concat('/api?foo=bar&page=', /foo:response/@page-number + 1)\" url-suffix=\"&api_key=asdkfjasd\" indent=yes delay=10");
 	}
 
 	private HashMap<String, String> arguments;
@@ -129,6 +133,8 @@ public class APIHarvester {
 	XPathExpression recordsXPath = null;
 	XPathExpression idXPath = null;
 	XPathExpression resumptionXPath = null;
+	XPathExpression resumeWhenXPath = null;
+	XPathExpression discardXPath = null;
 	private Transformer transformer = null;
 	
 	private void run() throws Exception {
@@ -155,6 +161,10 @@ public class APIHarvester {
 			idXPath = xpath.compile(arguments.get("id-xpath"));
 			if (arguments.containsKey("resumption-xpath")) {
 				resumptionXPath = xpath.compile(arguments.get("resumption-xpath"));
+			}
+			resumeWhenXPath = xpath.compile(getArgument("resume-when-xpath", "true()"));
+			if (arguments.containsKey("discard-xpath")) {
+				discardXPath = xpath.compile(arguments.get("discard-xpath"));
 			}
 			
 			// prepare transformer for serializing records
@@ -201,8 +211,32 @@ public class APIHarvester {
 		// parse the XML into separate records
 		NodeList records = getRecords(doc);
 		for (int i = records.getLength() - 1; i >= 0; i--) {
-			//System.out.println("Saving record " + Integer.valueOf(i) + " ...");
 			Node record = records.item(i);
+			// discard any unwanted parts of the record
+			if (discardXPath != null) {
+				NodeList discards =  (NodeList) discardXPath.evaluate(record, XPathConstants.NODESET);
+				for (int j = discards.getLength() - 1; j >= 0; j--) {
+					Node discard = discards.item(j);
+					switch (discard.getNodeType()) {
+						case Node.ATTRIBUTE_NODE:
+							System.out.println("Cannot discard attribute nodes");
+							break;
+						case Node.DOCUMENT_NODE:
+							System.out.println("Cannot discard document node");
+							break;
+						default:
+							if (discard.isSameNode(record)) {
+								System.out.println("Cannot discard entire record");
+							} else {
+								Node parent = discard.getParentNode();
+								if (parent != null) {
+									parent.removeChild(discard);
+								}
+							}
+					}
+				}
+			}
+			//System.out.println("Saving record " + Integer.valueOf(i) + " ...");
 			save(record);
 		}
 		// remember any resumption URLs
@@ -219,15 +253,22 @@ public class APIHarvester {
 		Stack<String> resumptionURLs = new Stack<String>();
 		if (resumptionXPath != null) {
 			try {
-				// accept a list of resumption URLs
-				NodeList resumptionURLNodes = null;
-				resumptionURLNodes = (NodeList) resumptionXPath.evaluate(
+				// first check whether we should resume
+				Boolean resume = (Boolean) resumeWhenXPath.evaluate(
 					doc,
-					XPathConstants.NODESET
+					XPathConstants.BOOLEAN
 				);
-				for (int i = resumptionURLNodes.getLength() - 1; i >= 0; i--) {
-					String relativeResumptionURL = resumptionURLNodes.item(i).getTextContent();
-					resumptionURLs.push(relativeResumptionURL);
+				if (resume) {
+					// generate a list of resumption URLs
+					NodeList resumptionURLNodes = null;
+					resumptionURLNodes = (NodeList) resumptionXPath.evaluate(
+						doc,
+						XPathConstants.NODESET
+					);
+					for (int i = resumptionURLNodes.getLength() - 1; i >= 0; i--) {
+						String relativeResumptionURL = resumptionURLNodes.item(i).getTextContent();
+						resumptionURLs.push(relativeResumptionURL);
+					}
 				}
 			} catch (Exception e) {
 				// accept a single resumption URL as a String
