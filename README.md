@@ -1,5 +1,6 @@
 # APIHarvester
-An application for harvesting metadata records from Trove, DigitalNZ, and similar APIs
+An application for harvesting XML metadata records from Trove, DigitalNZ, and similar "Web APIs".
+APIHarvester can also be used to extract portions of an XML file stored on a local file system, simply by specifying a `file:` URI in the request. This makes it usable e.g. for checking quality of bulk metadata records.
 
 APIHarvester is [available as an executable Java archive (jar) file](https://github.com/Conal-Tuohy/APIHarvester/releases/latest). 
 
