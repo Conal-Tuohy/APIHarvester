@@ -341,20 +341,24 @@ public class APIHarvester {
 	}
 	
 	private Document load(URL url) throws Exception {
-		return load(url, getRetries());
+		return load(url, 0);
 	}
 	
-	private Document load(URL url, int retriesRemaining) throws Exception {
+	private Document load(URL url, int numberOfRetries) throws Exception {
 		DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
 		factory.setNamespaceAware(true);
 		factory.setFeature("http://apache.org/xml/features/nonvalidating/load-external-dtd", false);
 		try {
 			return factory.newDocumentBuilder().parse(url.openStream());
 		} catch (Exception e) {
-			System.out.println("Error reading XML. " + String.valueOf(retriesRemaining) + " retries remaining.");
-			if (retriesRemaining > 0) {
-				Thread.sleep(5000); // wait 5s before retrying
-				return load(url, retriesRemaining - 1);
+			if (numberOfRetries < getRetries()) {
+				int secondsToWait = 5 * (int) Math.pow(2, numberOfRetries); 
+				System.out.println(
+					"Error reading XML. Retrying after " +  String.valueOf(secondsToWait) + "s. " +
+					"Retry " + String.valueOf(numberOfRetries + 1) + " of " + String.valueOf(getRetries()) + "."
+				);
+				Thread.sleep(secondsToWait * 1000); 
+				return load(url, numberOfRetries + 1);
 			} else {
 				throw e;
 			}
